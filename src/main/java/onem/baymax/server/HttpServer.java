@@ -50,7 +50,18 @@ public class HttpServer {
                 // create Response object
                 Response response = new Response(output);
                 response.setRequest(request);
-                response.sendStaticResource();
+
+                // servlet
+                if (request.getUri().startsWith("/servlet/")) {
+                    // dynamic resource
+                    ServletProcessor processor = new ServletProcessor();
+                    processor.process(request, response);
+                } else {
+                    // static resource
+                    StaticResourceProcessor processor = new StaticResourceProcessor();
+                    processor.process(request, response);
+                }
+
                 // close th socket
                 socket.close();
             } catch (Exception e) {
