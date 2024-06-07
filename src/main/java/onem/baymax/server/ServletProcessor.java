@@ -65,7 +65,7 @@ public class ServletProcessor {
             e1.printStackTrace();
         }
 
-        Servlet servlet = null;
+        Servlet servlet;
         try {
             servlet = (Servlet) servletClass.newInstance();
             servlet.service(request, response);
