@@ -1,12 +1,12 @@
 package onem.baymax.server;
 
+import javax.servlet.Servlet;
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.URLStreamHandler;
-import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
@@ -38,7 +38,7 @@ public class ServletProcessor {
         String uri = request.getUri();
         String servletName = uri.substring(uri.lastIndexOf("/") + 1);
         URLClassLoader loader = null;
-        OutputStream output = null;
+        PrintWriter writer = null;
         try {
             // Create a URLClassLoader
             URL[] urls = new URL[1];
@@ -50,31 +50,28 @@ public class ServletProcessor {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        try {
+            response.setCharacterEncoding("UTF-8");
+            writer = response.getWriter();
+        } catch (IOException e1) {
+            e1.printStackTrace();
+        }
+
         Class<?> servletClass = null;
         try {
             servletClass = loader.loadClass(servletName);
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
-        output = response.getOutput();
 
         String head = composeResponseHead();
-        try {
-            output.write(head.getBytes(StandardCharsets.UTF_8));
-        } catch (IOException e1) {
-            e1.printStackTrace();
-        }
-
+        writer.println(head);
         Servlet servlet;
         try {
             servlet = (Servlet) servletClass.newInstance();
             servlet.service(request, response);
         } catch (Throwable e) {
-            e.printStackTrace();
-        }
-        try {
-            output.flush();
-        } catch (IOException e) {
             e.printStackTrace();
         }
 
