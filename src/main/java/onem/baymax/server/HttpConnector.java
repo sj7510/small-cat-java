@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayDeque;
+import java.util.Deque;
 
 /**
  * 接收http请求
@@ -12,7 +14,17 @@ import java.net.Socket;
  */
 public class HttpConnector implements Runnable {
 
-    @Override public void run() {
+    int minProcessors = 3;
+
+    int maxProcessors = 10;
+
+    int curProcessors = 0;
+
+    private final Deque<HttpProcessor> processors = new ArrayDeque<>();
+
+    @Override
+
+    public void run() {
         ServerSocket serverSocket = null;
         int port = 8080;
         try {
@@ -21,16 +33,27 @@ public class HttpConnector implements Runnable {
             e.printStackTrace();
             System.exit(1);
         }
+
+        // initialize processors pool
+        for (int i = 0; i < minProcessors; i++) {
+            HttpProcessor initialProcessor = new HttpProcessor(this);
+            initialProcessor.start();
+            processors.push(initialProcessor);
+        }
+        curProcessors = minProcessors;
+
         // 循环接收请求
         for (; ; ) {
             Socket socket;
             try {
                 socket = serverSocket.accept();
-                HttpProcessor processor = new HttpProcessor();
-                processor.process(socket);
+                HttpProcessor processor = createProcessor();
+                if (processor == null) {
+                    socket.close();
+                    continue;
+                }
+                processor.assign(socket);
 
-                // close th socket
-                socket.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -43,6 +66,36 @@ public class HttpConnector implements Runnable {
     public void start() {
         Thread thread = new Thread(this);
         thread.start();
+    }
+
+    private HttpProcessor createProcessor() {
+        synchronized (processors) {
+            if (!processors.isEmpty()) {
+                return processors.pop();
+            }
+            if (curProcessors < maxProcessors) {
+                return newProcessor();
+            }
+            return null;
+        }
+
+    }
+
+    private HttpProcessor newProcessor() {
+        HttpProcessor initialProcessor = new HttpProcessor(this);
+        initialProcessor.start();
+        processors.push(initialProcessor);
+        curProcessors++;
+        return processors.pop();
+    }
+
+    /**
+     * 回收
+     *
+     * @param httpProcessor httpProcessor
+     */
+    public void recycle(HttpProcessor httpProcessor) {
+        processors.push(httpProcessor);
     }
 
 }

@@ -9,7 +9,17 @@ import java.net.Socket;
  *
  * @author hujiabin wrote in 2024/6/11 21:08
  */
-public class HttpProcessor {
+public class HttpProcessor implements Runnable {
+
+    Socket socket;
+
+    boolean available = true;
+
+    HttpConnector connector;
+
+    public HttpProcessor(HttpConnector connector) {
+        this.connector = connector;
+    }
 
     public HttpProcessor() {
 
@@ -47,6 +57,60 @@ public class HttpProcessor {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    @Override public void run() {
+        for (; ; ) {
+            // Wait for the next socket to be assigned
+            Socket socket = await();
+
+            if (socket == null) {
+                continue;
+            }
+
+            // Process the request from this socket
+            process(socket);
+
+            // Finish up this request
+            connector.recycle(this);
+
+        }
+
+    }
+
+    /**
+     * 启动线程
+     */
+    public void start() {
+        Thread thread = new Thread(this);
+        thread.start();
+    }
+
+    public synchronized void assign(Socket socket) {
+        // Wait for the connector to provide a new socket
+        while (available) {
+            await();
+        }
+        this.socket = socket;
+        available = true;
+        notifyAll();
+    }
+
+    private synchronized Socket await() {
+        // Wait for the connector to provide a new socket
+        while (!available) {
+            try {
+                wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        // Notify the connector that we have received this socket
+        Socket socket = this.socket;
+        available = false;
+        notifyAll();
+
+        return socket;
     }
 
 }
